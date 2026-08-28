@@ -1,11 +1,45 @@
-# Applicant Tracker (ATS) - Phase 1
+# Applicant Tracking System
 
-An end-to-end Applicant Tracking System (ATS) connecting **Recruiters** and **Candidates**.
+A full-stack Applicant Tracking System built with:
 
-## 🛠️ Tech Stack
-- **Backend**: Node.js, Express, TypeScript
-- **Frontend**: React, TypeScript
-- **Database & Auth & Storage**: Supabase (PostgreSQL with Row Level Security, Supabase Auth, Supabase Storage)
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Node.js + Express + TypeScript
+- **ORM & Database**: Sequelize + PostgreSQL / Supabase
+- **Authentication**: Supabase Authentication
+- **Security**: Row Level Security (RLS)
+
+---
+
+## 🚀 Current Features
+
+### 🔐 Authentication
+- Recruiter signup (`UserRole.RECRUITER = 1`)
+- Candidate signup (`UserRole.CANDIDATE = 2`)
+- Login authentication via Supabase Auth
+- Access token management with `Authorization: Bearer <accessToken>`
+- Role-based authorization middleware (`requireRole`)
+
+### 💼 Recruiter Module
+- Create job postings (`title`, `description`, `status`: DRAFT / OPEN / CLOSED)
+- View posted jobs (filtered by recruiter ownership)
+- Update job details and status
+- Delete job postings (with deletion confirmation)
+- View candidate applications received for posted jobs
+- Update candidate application stages (`APPLIED`, `SCREENING`, `INTERVIEW`, `OFFER`, `REJECTED`)
+
+### 📄 Candidate Module
+- Browse available open jobs (`JobStatus.OPEN = 2`)
+- View full job specifications
+- Apply for jobs (with confirmation modal)
+- View submitted applications with real-time stage badges
+
+### 🛡️ Security & Integrity
+- **Authentication Middleware**: `authenticateToken` verifies Supabase access tokens on protected routes
+- **Role-Based Authorization**: `requireRole` protects recruiter and candidate endpoints
+- **PostgreSQL Row Level Security (RLS)**: Enforced via `auth.uid()` and `SECURITY DEFINER` helper functions (`current_profile_id()`, `current_profile_role()`)
+- **Server-Controlled Ownership**: `candidate_id` and `recruiter_id` are derived strictly from authenticated token context (`req.user.userId`)
+- **Duplicate Application Protection**: Database-level `UNIQUE(job_id, candidate_id)` constraint caught as HTTP 409 Conflict
+- **Optimistic Concurrency Control**: Application stage updates require matching `version` numbers (`WHERE id = :id AND version = :expectedVersion`) to prevent race conditions
 
 ---
 
@@ -13,58 +47,75 @@ An end-to-end Applicant Tracking System (ATS) connecting **Recruiters** and **Ca
 
 ```
 applicant-tracker/
-│
-├── backend/                  # Node.js + TypeScript REST API architecture
+├── backend/                  # Express + TypeScript API Server
 │   ├── src/
-│   │   ├── config/          # Environment & Supabase client configuration
-│   │   ├── models/          # Database entity schemas & interfaces
-│   │   ├── routes/          # API route definitions
-│   │   ├── controllers/     # HTTP request/response handlers
-│   │   ├── services/        # Core business logic & stage state machine
-│   │   ├── validators/      # Input validation & transition rules
-│   │   ├── middleware/      # Auth JWT & role-based access control
-│   │   ├── utils/           # Promisify, debounce, concurrency utilities
-│   │   └── types/           # TypeScript interface & type definitions
-│   │
-│   └── tests/               # Backend unit & integration test suites
+│   │   ├── config/          # Database (Sequelize) & Supabase client config
+│   │   ├── controllers/     # HTTP Request/Response handlers
+│   │   ├── interfaces/      # Service DTOs & response interfaces
+│   │   ├── middleware/      # authenticateToken & requireRole middleware
+│   │   ├── models/          # Sequelize entities (Profile, Job, Application)
+│   │   ├── routes/          # API routes (/api/auth, /api/jobs, /api/applications)
+│   │   ├── services/        # Business logic layer
+│   │   └── types/           # Enums (UserRole, JobStatus, ApplicationStage)
 │
-├── frontend/                 # React + TypeScript SPA frontend
-│   └── src/
-│       ├── components/      # Reusable UI components
-│       ├── pages/           # Page views (Job Search, Dashboards, Applications)
-│       ├── hooks/           # Custom React hooks (e.g. debounced search)
-│       ├── services/        # API service integration layer
-│       ├── types/           # Shared TypeScript interfaces
-│       └── utils/           # Helper utilities
+├── frontend/                 # React + TypeScript + Vite SPA
+│   ├── src/
+│   │   ├── components/      # UI components & modals (JobList, CandidateJobList, ApplicationList, etc.)
+│   │   ├── context/         # AuthContext state provider
+│   │   ├── pages/           # SignupPage, LoginPage, RecruiterDashboard, CandidateDashboard
+│   │   ├── services/        # Centralized fetch API client & service integration
+│   │   ├── types/           # Shared TypeScript interfaces & enums
+│   │   └── utils/           # Token storage helpers
 │
-├── supabase/
-│   └── migrations/          # SQL migrations (RLS, schema, indexes, constraints)
-│
-├── scripts/                 # Maintenance & data seeding scripts
-│
-├── DESIGN.md                # System design & architecture specification
-├── ASYNC.md                 # Documentation for 6 mandatory async patterns
-├── README.md                # Project overview and workspace guide
-├── .env.example             # Environment variable template
-└── .gitignore               # Git ignore pattern rules
+└── supabase/
+    └── migrations/          # SQL migrations (001-005: profiles, jobs, applications, RLS policies)
 ```
 
 ---
 
-## 📄 Key Documentation
+## 🛠️ Local Development & Setup
 
-- **[DESIGN.md](file:///c:/Users/91969/Documents/Engineering/Mini%20Application%20Tracker/applicant-tracker/DESIGN.md)**: System architecture overview, roles, database entity design (`profiles`, `jobs`, `applications` with `version`), relationships, unique constraints, application stage state machine, RLS authorization strategy, indexes, streaming CSV exports, and email queue design.
-- **[ASYNC.md](file:///c:/Users/91969/Documents/Engineering/Mini%20Application%20Tracker/applicant-tracker/ASYNC.md)**: Design, implementation plan, application mapping, and testing strategies for all six asynchronous requirements:
-  1. `3.1 Callback → Promise` (Resume Upload)
-  2. `3.2 Concurrency Limiter` (Bulk Stage Updates max 5)
-  3. `3.3 Event Loop / CSV` (Streaming Export 10k+ rows)
-  4. `3.4 Fire-and-Forget Email` (Background Notification)
-  5. `3.5 Race Condition` (Optimistic Locking via `applications.version`)
-  6. `3.6 Closures / Debounce` (Job Search Input)
+### Prerequisites
+- Node.js (v18+)
+- npm / npx
 
----
+### 1. Install Dependencies
+```bash
+# Backend / Root dependencies
+npm install
 
-## 📌 Phase Status
+# Frontend dependencies
+cd frontend
+npm install
+cd ..
+```
 
-- **Phase 1 (Complete)**: Architecture skeleton, folder structure, and design specifications established. No database migrations, backend business logic, or frontend UI implemented yet.
-- **Phase 2 (Pending)**: Database migration SQL scripts, Supabase RLS policies, backend implementation, frontend implementation, and async requirement integrations.
+### 2. Configure Environment Variables
+Create `backend/.env`:
+```env
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/postgres
+SUPABASE_URL=https://<your-supabase-project>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<your-supabase-publishable-key>
+```
+
+Create `frontend/.env`:
+```env
+VITE_API_BASE_URL=http://localhost:3000
+```
+
+### 3. Start Development Servers
+Run the Express backend (Port 3000):
+```bash
+cd backend
+npm run dev
+```
+
+Run the React frontend (Port 5173):
+```bash
+cd frontend
+npm run dev
+```
+
+Open your browser at: **[http://localhost:5173](http://localhost:5173)**
