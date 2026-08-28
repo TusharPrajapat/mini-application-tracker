@@ -2,29 +2,73 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Job } from "../types/job";
 import { Application } from "../types/application";
+import {
+  CandidateProfile,
+  CreateCandidateProfilePayload,
+  UpdateCandidateProfilePayload,
+} from "../types/candidateProfile";
 import { getJobs } from "../services/jobService";
 import {
   getApplications,
   createApplication,
 } from "../services/applicationService";
+import {
+  getProfile,
+  createProfile,
+  updateProfile,
+  deleteProfile,
+} from "../services/candidateProfileService";
+import {
+  uploadResume,
+  getResume,
+  deleteResume,
+} from "../services/resumeService";
+
 import { CandidateJobList } from "../components/jobs/CandidateJobList";
 import { JobDetailsModal } from "../components/jobs/JobDetailsModal";
 import { ApplyConfirmModal } from "../components/applications/ApplyConfirmModal";
 import { ApplicationList } from "../components/applications/ApplicationList";
+import { CandidateProfileCard } from "../components/profile/CandidateProfileCard";
+import { CandidateProfileForm } from "../components/profile/CandidateProfileForm";
+import { DeleteProfileConfirmModal } from "../components/profile/DeleteProfileConfirmModal";
+import { ResumeUploadModal } from "../components/profile/ResumeUploadModal";
+import { DeleteResumeConfirmModal } from "../components/profile/DeleteResumeConfirmModal";
 
 export const CandidateDashboard: React.FC = () => {
   const { logout } = useAuth();
 
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
-  const [loadingApps, setLoadingApps] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "jobs" | "applications" | "profile"
+  >("jobs");
 
-  // Modals
+  // Open Jobs State
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
+  const [jobError, setJobError] = useState<string | null>(null);
+
+  // Candidate Applications State
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loadingApps, setLoadingApps] = useState<boolean>(true);
+  const [appError, setAppError] = useState<string | null>(null);
+
+  // Candidate Profile State
+  const [profile, setProfile] = useState<CandidateProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Modals & Notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedJobForView, setSelectedJobForView] = useState<Job | null>(null);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+
+  // Profile Modals
+  const [isProfileFormOpen, setIsProfileFormOpen] = useState<boolean>(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+
+  // Resume Modals
+  const [isResumeUploadOpen, setIsResumeUploadOpen] = useState<boolean>(false);
+  const [isReplaceResumeMode, setIsReplaceResumeMode] = useState<boolean>(false);
+  const [isResumeDeleteOpen, setIsResumeDeleteOpen] = useState<boolean>(false);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -36,7 +80,7 @@ export const CandidateDashboard: React.FC = () => {
   const fetchOpenJobs = useCallback(async () => {
     try {
       setLoadingJobs(true);
-      setError(null);
+      setJobError(null);
       const res = await getJobs();
       if (res.success && Array.isArray(res.data)) {
         setJobs(res.data);
@@ -44,7 +88,7 @@ export const CandidateDashboard: React.FC = () => {
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Failed to load open jobs";
-      setError(errorMsg);
+      setJobError(errorMsg);
     } finally {
       setLoadingJobs(false);
     }
@@ -53,6 +97,7 @@ export const CandidateDashboard: React.FC = () => {
   const fetchMyApplications = useCallback(async () => {
     try {
       setLoadingApps(true);
+      setAppError(null);
       const res = await getApplications();
       if (res.success && Array.isArray(res.data)) {
         setApplications(res.data);
@@ -60,16 +105,37 @@ export const CandidateDashboard: React.FC = () => {
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Failed to load applications";
-      setError(errorMsg);
+      setAppError(errorMsg);
     } finally {
       setLoadingApps(false);
+    }
+  }, []);
+
+  const fetchCandidateProfile = useCallback(async () => {
+    try {
+      setLoadingProfile(true);
+      setProfileError(null);
+      const res = await getProfile();
+      if (res.success && res.data?.profile) {
+        setProfile(res.data.profile);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("404") || msg.toLowerCase().includes("not found")) {
+        setProfile(null);
+      } else {
+        setProfileError(msg || "Failed to load candidate profile");
+      }
+    } finally {
+      setLoadingProfile(false);
     }
   }, []);
 
   useEffect(() => {
     fetchOpenJobs();
     fetchMyApplications();
-  }, [fetchOpenJobs, fetchMyApplications]);
+    fetchCandidateProfile();
+  }, [fetchOpenJobs, fetchMyApplications, fetchCandidateProfile]);
 
   const appliedJobIds = useMemo(() => {
     return new Set(applications.map((app) => app.job_id));
@@ -79,6 +145,65 @@ export const CandidateDashboard: React.FC = () => {
     await createApplication({ job_id: job.id });
     showToast(`Application submitted successfully for ${job.title}`);
     await fetchMyApplications();
+  };
+
+  const handleSaveProfile = async (
+    payload: CreateCandidateProfilePayload | UpdateCandidateProfilePayload
+  ) => {
+    if (profile) {
+      const res = await updateProfile(payload as UpdateCandidateProfilePayload);
+      if (res.success && res.data?.profile) {
+        setProfile(res.data.profile);
+        showToast("Candidate profile updated successfully");
+      }
+    } else {
+      const res = await createProfile(payload as CreateCandidateProfilePayload);
+      if (res.success && res.data?.profile) {
+        setProfile(res.data.profile);
+        showToast("Candidate profile created successfully");
+      }
+    }
+    setIsProfileFormOpen(false);
+  };
+
+  const handleDeleteProfileConfirm = async () => {
+    await deleteProfile();
+    setProfile(null);
+    setIsDeleteModalOpen(false);
+    showToast("Candidate profile deleted successfully");
+  };
+
+  // Resume Handlers
+  const handleUploadResumeFile = async (file: File) => {
+    const res = await uploadResume(file);
+    if (res.success && res.data?.resumePath) {
+      await fetchCandidateProfile();
+      setIsResumeUploadOpen(false);
+      showToast(
+        isReplaceResumeMode
+          ? "Resume replaced successfully"
+          : "Resume uploaded successfully"
+      );
+    }
+  };
+
+  const handleViewResume = async () => {
+    try {
+      const res = await getResume();
+      if (res.success && res.data?.signedUrl) {
+        window.open(res.data.signedUrl, "_blank");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to open resume";
+      showToast(`⚠️ ${msg}`);
+    }
+  };
+
+  const handleDeleteResumeConfirm = async () => {
+    await deleteResume();
+    await fetchCandidateProfile();
+    setIsResumeDeleteOpen(false);
+    showToast("Resume deleted successfully");
   };
 
   return (
@@ -94,66 +219,169 @@ export const CandidateDashboard: React.FC = () => {
         </button>
       </header>
 
+      {/* Navigation Tabs */}
+      <div style={styles.tabBarContainer}>
+        <div style={styles.tabBar}>
+          <button
+            onClick={() => setActiveTab("jobs")}
+            style={
+              activeTab === "jobs"
+                ? { ...styles.tabButton, ...styles.activeTabButton }
+                : styles.tabButton
+            }
+          >
+            💼 Available Jobs ({jobs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("applications")}
+            style={
+              activeTab === "applications"
+                ? { ...styles.tabButton, ...styles.activeTabButton }
+                : styles.tabButton
+            }
+          >
+            📄 My Applications ({applications.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("profile")}
+            style={
+              activeTab === "profile"
+                ? { ...styles.tabButton, ...styles.activeTabButton }
+                : styles.tabButton
+            }
+          >
+            👤 My Profile {profile ? "✓" : ""}
+          </button>
+        </div>
+      </div>
+
       <main style={styles.main}>
         {toastMessage && (
           <div style={styles.toast}>
-            <span>✅ {toastMessage}</span>
+            <span>{toastMessage.startsWith("⚠️") ? toastMessage : `✅ ${toastMessage}`}</span>
           </div>
         )}
 
-        {error && (
-          <div style={styles.errorBanner}>
-            <p style={styles.errorBannerText}>{error}</p>
-            <button
-              onClick={() => {
-                fetchOpenJobs();
-                fetchMyApplications();
-              }}
-              style={styles.retryBtn}
-            >
-              Retry
-            </button>
-          </div>
+        {/* Tab 1: Available Jobs */}
+        {activeTab === "jobs" && (
+          <section style={styles.section}>
+            {jobError && (
+              <div style={styles.errorBanner}>
+                <p style={styles.errorBannerText}>{jobError}</p>
+                <button onClick={fetchOpenJobs} style={styles.retryBtn}>
+                  Retry
+                </button>
+              </div>
+            )}
+
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>Available Open Jobs</h2>
+              <span style={styles.countBadge}>{jobs.length} open</span>
+            </div>
+
+            {loadingJobs ? (
+              <div style={styles.loadingBox}>
+                <div style={styles.spinner}></div>
+                <p style={styles.loadingText}>Loading available jobs...</p>
+              </div>
+            ) : (
+              <CandidateJobList
+                jobs={jobs}
+                appliedJobIds={appliedJobIds}
+                onView={(job) => setSelectedJobForView(job)}
+                onApply={(job) => setSelectedJobForApply(job)}
+              />
+            )}
+          </section>
         )}
 
-        {/* Section 1: Available Open Jobs */}
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Available Open Jobs</h2>
-            <span style={styles.countBadge}>{jobs.length} open</span>
-          </div>
+        {/* Tab 2: My Applications */}
+        {activeTab === "applications" && (
+          <section style={styles.section}>
+            {appError && (
+              <div style={styles.errorBanner}>
+                <p style={styles.errorBannerText}>{appError}</p>
+                <button onClick={fetchMyApplications} style={styles.retryBtn}>
+                  Retry
+                </button>
+              </div>
+            )}
 
-          {loadingJobs ? (
-            <div style={styles.loadingBox}>
-              <div style={styles.spinner}></div>
-              <p style={styles.loadingText}>Loading available jobs...</p>
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>My Submitted Applications</h2>
+              <span style={styles.countBadge}>
+                {applications.length} submitted
+              </span>
             </div>
-          ) : (
-            <CandidateJobList
-              jobs={jobs}
-              appliedJobIds={appliedJobIds}
-              onView={(job) => setSelectedJobForView(job)}
-              onApply={(job) => setSelectedJobForApply(job)}
-            />
-          )}
-        </section>
 
-        {/* Section 2: My Applications */}
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>My Applications</h2>
-            <span style={styles.countBadge}>{applications.length} submitted</span>
-          </div>
+            {loadingApps ? (
+              <div style={styles.loadingBox}>
+                <div style={styles.spinner}></div>
+                <p style={styles.loadingText}>Loading your applications...</p>
+              </div>
+            ) : (
+              <ApplicationList applications={applications} />
+            )}
+          </section>
+        )}
 
-          {loadingApps ? (
-            <div style={styles.loadingBox}>
-              <div style={styles.spinner}></div>
-              <p style={styles.loadingText}>Loading your applications...</p>
+        {/* Tab 3: My Candidate Profile */}
+        {activeTab === "profile" && (
+          <section style={styles.section}>
+            {profileError && (
+              <div style={styles.errorBanner}>
+                <p style={styles.errorBannerText}>{profileError}</p>
+                <button onClick={fetchCandidateProfile} style={styles.retryBtn}>
+                  Retry
+                </button>
+              </div>
+            )}
+
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>My Candidate Profile</h2>
+              {profile ? (
+                <span style={styles.profileBadge}>Active Profile</span>
+              ) : (
+                <span style={styles.noProfileBadge}>Not Created</span>
+              )}
             </div>
-          ) : (
-            <ApplicationList applications={applications} />
-          )}
-        </section>
+
+            {loadingProfile ? (
+              <div style={styles.loadingBox}>
+                <div style={styles.spinner}></div>
+                <p style={styles.loadingText}>Loading candidate profile...</p>
+              </div>
+            ) : profile ? (
+              <CandidateProfileCard
+                profile={profile}
+                onEdit={() => setIsProfileFormOpen(true)}
+                onDelete={() => setIsDeleteModalOpen(true)}
+                onUploadResume={() => {
+                  setIsReplaceResumeMode(Boolean(profile.resume_path));
+                  setIsResumeUploadOpen(true);
+                }}
+                onViewResume={handleViewResume}
+                onDeleteResume={() => setIsResumeDeleteOpen(true)}
+              />
+            ) : (
+              <div style={styles.emptyProfileCard}>
+                <div style={styles.emptyIcon}>👤</div>
+                <h3 style={styles.emptyTitle}>
+                  You haven't created your profile yet
+                </h3>
+                <p style={styles.emptySubtitle}>
+                  Create your candidate profile first to highlight your technical skills, phone number, and resume.
+                </p>
+                <button
+                  onClick={() => setIsProfileFormOpen(true)}
+                  style={styles.createProfileBtn}
+                >
+                  ➕ Create Candidate Profile
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* View Job Details Modal */}
@@ -167,6 +395,37 @@ export const CandidateDashboard: React.FC = () => {
         job={selectedJobForApply}
         onClose={() => setSelectedJobForApply(null)}
         onConfirm={handleApplyConfirm}
+      />
+
+      {/* Candidate Profile Form Modal (Create / Edit) */}
+      {isProfileFormOpen && (
+        <CandidateProfileForm
+          initialProfile={profile}
+          onSave={handleSaveProfile}
+          onCancel={() => setIsProfileFormOpen(false)}
+        />
+      )}
+
+      {/* Delete Profile Confirmation Modal */}
+      <DeleteProfileConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteProfileConfirm}
+      />
+
+      {/* Resume Upload / Replace Modal */}
+      <ResumeUploadModal
+        isOpen={isResumeUploadOpen}
+        isReplaceMode={isReplaceResumeMode}
+        onClose={() => setIsResumeUploadOpen(false)}
+        onUpload={handleUploadResumeFile}
+      />
+
+      {/* Delete Resume Confirmation Modal */}
+      <DeleteResumeConfirmModal
+        isOpen={isResumeDeleteOpen}
+        onClose={() => setIsResumeDeleteOpen(false)}
+        onConfirm={handleDeleteResumeConfirm}
       />
     </div>
   );
@@ -185,7 +444,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     maxWidth: "1000px",
-    margin: "0 auto 2rem auto",
+    margin: "0 auto 1.5rem auto",
     flexWrap: "wrap",
     gap: "1rem",
   },
@@ -212,6 +471,32 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "600",
     fontSize: "0.95rem",
     cursor: "pointer",
+  },
+  tabBarContainer: {
+    maxWidth: "1000px",
+    margin: "0 auto 2rem auto",
+    borderBottom: "1px solid #334155",
+  },
+  tabBar: {
+    display: "flex",
+    gap: "0.5rem",
+    overflowX: "auto",
+  },
+  tabButton: {
+    backgroundColor: "transparent",
+    color: "#94a3b8",
+    border: "none",
+    borderBottom: "2px solid transparent",
+    padding: "0.75rem 1.25rem",
+    fontWeight: "600",
+    fontSize: "0.95rem",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  },
+  activeTabButton: {
+    color: "#38bdf8",
+    borderBottom: "2px solid #38bdf8",
+    backgroundColor: "rgba(56, 189, 248, 0.05)",
   },
   main: {
     maxWidth: "1000px",
@@ -276,6 +561,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "9999px",
     border: "1px solid #334155",
   },
+  profileBadge: {
+    color: "#4ade80",
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    padding: "0.25rem 0.65rem",
+    borderRadius: "9999px",
+    border: "1px solid rgba(34, 197, 94, 0.3)",
+  },
+  noProfileBadge: {
+    color: "#fbbf24",
+    backgroundColor: "rgba(251, 191, 36, 0.15)",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    padding: "0.25rem 0.65rem",
+    borderRadius: "9999px",
+    border: "1px solid rgba(251, 191, 36, 0.3)",
+  },
   loadingBox: {
     textAlign: "center",
     padding: "3rem",
@@ -296,5 +599,44 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#94a3b8",
     margin: 0,
     fontSize: "0.95rem",
+  },
+  emptyProfileCard: {
+    backgroundColor: "rgba(30, 41, 59, 0.6)",
+    borderRadius: "1rem",
+    border: "1px dashed rgba(255, 255, 255, 0.15)",
+    padding: "3rem 2rem",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "1rem",
+  },
+  emptyIcon: {
+    fontSize: "3rem",
+    margin: 0,
+  },
+  emptyTitle: {
+    fontSize: "1.25rem",
+    fontWeight: "600",
+    color: "#f8fafc",
+    margin: 0,
+  },
+  emptySubtitle: {
+    color: "#94a3b8",
+    fontSize: "0.95rem",
+    maxWidth: "500px",
+    margin: 0,
+    lineHeight: "1.5",
+  },
+  createProfileBtn: {
+    backgroundColor: "#38bdf8",
+    color: "#0f172a",
+    border: "none",
+    borderRadius: "0.5rem",
+    padding: "0.75rem 1.5rem",
+    fontWeight: "700",
+    fontSize: "0.95rem",
+    cursor: "pointer",
+    marginTop: "0.5rem",
   },
 };

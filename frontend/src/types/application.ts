@@ -47,3 +47,31 @@ export interface ApplicationSingleResponse {
   message?: string;
   data: Application;
 }
+
+export interface ApplicationCandidateProfileResponse {
+  success: boolean;
+  data: {
+    candidate: {
+      id: number;
+      email: string;
+      role: number;
+    };
+    profile: {
+      full_name: string;
+      phone?: string | null;
+      skills?: string | null;
+      experience?: string | null;
+      resume_path?: string | null;
+      created_at: string;
+      updated_at: string;
+    };
+  };
+}
+
+export interface ApplicationCandidateResumeResponse {
+  success: boolean;
+  data: {
+    signedUrl: string;
+    expiresIn: number;
+  };
+}

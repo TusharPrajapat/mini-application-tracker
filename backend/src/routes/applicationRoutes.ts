@@ -39,4 +39,22 @@ router.put(
     applicationController.updateApplicationStage(req, res, next)
 );
 
+// GET /api/applications/:id/candidate-profile - Get applicant's candidate profile (RECRUITER only)
+router.get(
+  "/:id/candidate-profile",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) =>
+    applicationController.getCandidateProfileForApplication(req, res, next)
+);
+
+// GET /api/applications/:id/candidate-resume - Get applicant's 60-second signed resume URL (RECRUITER only)
+router.get(
+  "/:id/candidate-resume",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) =>
+    applicationController.getCandidateResumeForApplication(req, res, next)
+);
+
 export default router;

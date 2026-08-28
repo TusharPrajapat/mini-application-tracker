@@ -27,13 +27,17 @@ async function startServer() {
     app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
     app.use(express.json());
 
-    // 6. Register Auth, Profile, Job & Application routes
+    // 6. Register Auth, Profile, CandidateProfile, Resume, Job & Application routes
     const { default: authRoutes } = await import('./routes/authRoutes');
     const { default: profileRoutes } = await import('./routes/profileRoutes');
+    const { default: candidateProfileRoutes } = await import('./routes/candidateProfileRoutes');
+    const { default: resumeRoutes } = await import('./routes/resumeRoutes');
     const { default: jobRoutes } = await import('./routes/jobRoutes');
     const { default: applicationRoutes } = await import('./routes/applicationRoutes');
     app.use('/api/auth', authRoutes);
     app.use('/api/profiles', profileRoutes);
+    app.use('/api/profile/resume', resumeRoutes);
+    app.use('/api/profile', candidateProfileRoutes);
     app.use('/api/jobs', jobRoutes);
     app.use('/api/applications', applicationRoutes);
 

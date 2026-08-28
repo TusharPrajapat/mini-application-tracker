@@ -4,6 +4,8 @@ import {
   UpdateApplicationStagePayload,
   ApplicationListResponse,
   ApplicationSingleResponse,
+  ApplicationCandidateProfileResponse,
+  ApplicationCandidateResumeResponse,
 } from "../types/application";
 
 export async function createApplication(
@@ -33,4 +35,20 @@ export async function updateApplicationStage(
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getCandidateProfileForApplication(
+  applicationId: number
+): Promise<ApplicationCandidateProfileResponse> {
+  return apiClient<ApplicationCandidateProfileResponse>(
+    `/api/applications/${applicationId}/candidate-profile`
+  );
+}
+
+export async function getCandidateResumeForApplication(
+  applicationId: number
+): Promise<ApplicationCandidateResumeResponse> {
+  return apiClient<ApplicationCandidateResumeResponse>(
+    `/api/applications/${applicationId}/candidate-resume`
+  );
 }

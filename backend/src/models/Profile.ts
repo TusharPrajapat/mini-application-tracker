@@ -10,6 +10,7 @@ import sequelize from "../config/database";
 import { UserRole } from "../types/commonEnum";
 import type { Job } from "./Job";
 import type { Application } from "./Application";
+import type { CandidateProfile } from "./CandidateProfile";
 
 export class Profile extends Model<
   InferAttributes<Profile>,
@@ -25,6 +26,7 @@ export class Profile extends Model<
   // Associations (populated via joins)
   declare jobs?: NonAttribute<Job[]>;
   declare applications?: NonAttribute<Application[]>;
+  declare candidateProfile?: NonAttribute<CandidateProfile>;
 }
 
 Profile.init(
