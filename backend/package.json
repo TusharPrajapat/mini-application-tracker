@@ -1,0 +1,10 @@
+{
+  "name": "applicant-tracker-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx tsx watch src/server.ts",
+    "build": "npx tsc",
+    "start": "node dist/server.js"
+  }
+}
