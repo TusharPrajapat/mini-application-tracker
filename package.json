@@ -5,7 +5,10 @@
   "scripts": {
     "dev:backend": "npx tsx watch backend/src/server.ts",
     "build": "npx tsc",
-    "start:backend": "node dist/server.js"
+    "start:backend": "node dist/server.js",
+    "seed": "npx tsx backend/scripts/seedData.ts",
+    "seed:benchmark": "npx tsx backend/scripts/seedBenchmarkData.ts",
+    "seedBenchmarkData": "npx tsx backend/scripts/seedBenchmarkData.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

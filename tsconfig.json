@@ -9,5 +9,5 @@
     "types": ["node"],
     "outDir": "./dist"
   },
-  "include": ["backend/src/**/*"]
+  "include": ["backend/src/**/*", "backend/tests/**/*"]
 }

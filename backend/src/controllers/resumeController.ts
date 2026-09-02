@@ -16,9 +16,12 @@ export class ResumeController {
         return;
       }
 
+      const accessToken = req.headers.authorization?.split(" ")[1];
+
       const result = await resumeService.uploadResume(
         req.user.userId,
-        req.file
+        req.file,
+        accessToken
       );
 
       res.status(200).json({
@@ -66,7 +69,12 @@ export class ResumeController {
         return;
       }
 
-      const result = await resumeService.getResume(req.user.userId);
+      const accessToken = req.headers.authorization?.split(" ")[1];
+
+      const result = await resumeService.getResume(
+        req.user.userId,
+        accessToken
+      );
 
       res.status(200).json({
         success: true,
@@ -104,7 +112,9 @@ export class ResumeController {
         return;
       }
 
-      await resumeService.deleteResume(req.user.userId);
+      const accessToken = req.headers.authorization?.split(" ")[1];
+
+      await resumeService.deleteResume(req.user.userId, accessToken);
 
       res.status(200).json({
         success: true,

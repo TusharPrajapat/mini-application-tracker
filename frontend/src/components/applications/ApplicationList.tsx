@@ -3,10 +3,12 @@ import { Application, ApplicationStage } from "../../types/application";
 
 interface ApplicationListProps {
   applications: Application[];
+  onViewTimeline?: (applicationId: number) => void;
 }
 
 export const ApplicationList: React.FC<ApplicationListProps> = ({
   applications,
+  onViewTimeline,
 }) => {
   if (applications.length === 0) {
     return (
@@ -58,6 +60,9 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({
             <th style={styles.th}>Application Stage</th>
             <th style={styles.th}>Applied Date</th>
             <th style={styles.th}>Last Updated</th>
+            {onViewTimeline && (
+              <th style={{ ...styles.th, textAlign: "right" }}>Timeline</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -69,6 +74,16 @@ export const ApplicationList: React.FC<ApplicationListProps> = ({
               <td style={styles.td}>{renderStageBadge(app.stage)}</td>
               <td style={styles.tdDate}>{formatDate(app.created_at)}</td>
               <td style={styles.tdDate}>{formatDate(app.updated_at)}</td>
+              {onViewTimeline && (
+                <td style={styles.tdActions}>
+                  <button
+                    onClick={() => onViewTimeline(app.id)}
+                    style={styles.viewStatusBtn}
+                  >
+                    View Status
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -147,6 +162,22 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#94a3b8",
     fontSize: "0.875rem",
     whiteSpace: "nowrap",
+  },
+  tdActions: {
+    padding: "1rem 1.25rem",
+    verticalAlign: "middle",
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  },
+  viewStatusBtn: {
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    color: "#38bdf8",
+    border: "1px solid rgba(56, 189, 248, 0.3)",
+    borderRadius: "0.375rem",
+    padding: "0.4rem 0.85rem",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    cursor: "pointer",
   },
   badge: {
     padding: "0.25rem 0.65rem",

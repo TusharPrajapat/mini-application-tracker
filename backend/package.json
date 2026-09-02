@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "npx tsx watch src/server.ts",
     "build": "npx tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "seed": "npx tsx scripts/seedData.ts",
+    "seed:benchmark": "npx tsx scripts/seedBenchmarkData.ts",
+    "seedBenchmarkData": "npx tsx scripts/seedBenchmarkData.ts"
   }
 }

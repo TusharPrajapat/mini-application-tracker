@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { jobController } from "../controllers/jobController";
+import { applicationController } from "../controllers/applicationController";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { requireRole } from "../middleware/roleMiddleware";
 import { UserRole } from "../types/commonEnum";
@@ -44,6 +45,23 @@ router.delete(
   authenticateToken,
   requireRole(UserRole.RECRUITER),
   (req, res, next) => jobController.deleteJob(req, res, next)
+);
+
+// POST /api/jobs/:id/applications/bulk-stage - Recruiter bulk stage change (RECRUITER only)
+router.post(
+  "/:id/applications/bulk-stage",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) =>
+    applicationController.bulkUpdateApplicationStage(req, res, next)
+);
+
+// GET /api/jobs/:id/export - Recruiter CSV export of applications for job (RECRUITER only)
+router.get(
+  "/:id/export",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) => applicationController.exportApplications(req, res, next)
 );
 
 export default router;

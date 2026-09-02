@@ -26,9 +26,24 @@ export interface UpdateJobPayload {
   status?: JobStatus;
 }
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface JobListQuery {
+  page?: number;
+  limit?: number;
+}
+
 export interface JobListResponse {
   success: boolean;
-  data: Job[];
+  data: {
+    jobs: Job[];
+    pagination: PaginationMeta;
+  };
 }
 
 export interface JobSingleResponse {

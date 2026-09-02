@@ -1,22 +1,28 @@
 import React from "react";
-import { Job, JobStatus } from "../../types/job";
+import { Job, JobStatus, PaginationMeta } from "../../types/job";
 
 interface JobListProps {
   jobs: Job[];
+  pagination?: PaginationMeta;
+  loading?: boolean;
   onView: (job: Job) => void;
   onEdit: (job: Job) => void;
   onDelete: (job: Job) => void;
   onCreateClick: () => void;
+  onPageChange?: (page: number) => void;
 }
 
 export const JobList: React.FC<JobListProps> = ({
   jobs,
+  pagination,
+  loading = false,
   onView,
   onEdit,
   onDelete,
   onCreateClick,
+  onPageChange,
 }) => {
-  if (jobs.length === 0) {
+  if (jobs.length === 0 && !loading) {
     return (
       <div style={styles.emptyContainer}>
         <div style={styles.emptyIcon}>📋</div>
@@ -56,63 +62,105 @@ export const JobList: React.FC<JobListProps> = ({
     }
   };
 
+  const currentPage = pagination?.page || 1;
+  const totalPages = pagination?.totalPages || 0;
+  const totalRecords = pagination?.total || 0;
+
   return (
-    <div style={styles.tableWrapper}>
-      <table style={styles.table}>
-        <thead>
-          <tr style={styles.tableHeaderRow}>
-            <th style={styles.th}>Title</th>
-            <th style={styles.th}>Description</th>
-            <th style={styles.th}>Status</th>
-            <th style={styles.th}>Created</th>
-            <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => (
-            <tr key={job.id} style={styles.tr}>
-              <td style={styles.tdTitle}>{job.title}</td>
-              <td style={styles.tdDesc}>
-                {job.description.length > 60
-                  ? `${job.description.substring(0, 60)}...`
-                  : job.description}
-              </td>
-              <td style={styles.td}>{renderStatusBadge(job.status)}</td>
-              <td style={styles.tdDate}>{formatDate(job.created_at)}</td>
-              <td style={styles.tdActions}>
-                <div style={styles.actionGroup}>
-                  <button
-                    onClick={() => onView(job)}
-                    style={{ ...styles.actionBtn, ...styles.viewBtn }}
-                    title="View Job"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={() => onEdit(job)}
-                    style={{ ...styles.actionBtn, ...styles.editBtn }}
-                    title="Edit Job"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(job)}
-                    style={{ ...styles.actionBtn, ...styles.deleteBtn }}
-                    title="Delete Job"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
+    <div style={styles.container}>
+      <div style={styles.tableWrapper}>
+        <table style={styles.table}>
+          <thead>
+            <tr style={styles.tableHeaderRow}>
+              <th style={styles.th}>Title</th>
+              <th style={styles.th}>Description</th>
+              <th style={styles.th}>Status</th>
+              <th style={styles.th}>Created</th>
+              <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {jobs.map((job) => (
+              <tr key={job.id} style={styles.tr}>
+                <td style={styles.tdTitle}>{job.title}</td>
+                <td style={styles.tdDesc}>
+                  {job.description.length > 60
+                    ? `${job.description.substring(0, 60)}...`
+                    : job.description}
+                </td>
+                <td style={styles.td}>{renderStatusBadge(job.status)}</td>
+                <td style={styles.tdDate}>{formatDate(job.created_at)}</td>
+                <td style={styles.tdActions}>
+                  <div style={styles.actionGroup}>
+                    <button
+                      onClick={() => onView(job)}
+                      style={{ ...styles.actionBtn, ...styles.viewBtn }}
+                      title="View Job"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => onEdit(job)}
+                      style={{ ...styles.actionBtn, ...styles.editBtn }}
+                      title="Edit Job"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onDelete(job)}
+                      style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                      title="Delete Job"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Controls */}
+      {pagination && totalPages > 0 && onPageChange && (
+        <div style={styles.paginationBar}>
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1 || loading}
+            style={
+              currentPage <= 1 || loading
+                ? { ...styles.pageBtn, ...styles.pageBtnDisabled }
+                : styles.pageBtn
+            }
+          >
+            ‹ Previous
+          </button>
+          <span style={styles.pageInfo}>
+            Page {currentPage} of {totalPages} ({totalRecords} total)
+          </span>
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages || loading}
+            style={
+              currentPage >= totalPages || loading
+                ? { ...styles.pageBtn, ...styles.pageBtnDisabled }
+                : styles.pageBtn
+            }
+          >
+            Next ›
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 const styles: Record<string, React.CSSProperties> = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  },
   emptyContainer: {
     textAlign: "center",
     padding: "3.5rem 1.5rem",
@@ -256,5 +304,36 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "rgba(239, 68, 68, 0.15)",
     color: "#f87171",
     border: "1px solid rgba(239, 68, 68, 0.3)",
+  },
+  paginationBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(30, 41, 59, 0.7)",
+    borderRadius: "0.75rem",
+    padding: "0.75rem 1.25rem",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+  },
+  pageInfo: {
+    color: "#94a3b8",
+    fontSize: "0.9rem",
+    fontWeight: "500",
+  },
+  pageBtn: {
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    color: "#38bdf8",
+    border: "1px solid rgba(56, 189, 248, 0.3)",
+    borderRadius: "0.5rem",
+    padding: "0.45rem 1rem",
+    fontSize: "0.875rem",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  pageBtnDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    color: "#64748b",
+    backgroundColor: "transparent",
   },
 };

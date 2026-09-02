@@ -119,3 +119,35 @@ npm run dev
 ```
 
 Open your browser at: **[http://localhost:5173](http://localhost:5173)**
+
+---
+
+##  🌱 Database Seeding
+
+### Normal Seed Script (Local Development & Demo)
+Populates the database with a realistic demo dataset containing approximately **10 jobs**, **20 candidate profiles**, and **50 candidate applications** distributed across all application stages:
+```bash
+npm run seed
+```
+
+**Default Credentials for Seeded Accounts**:
+- **Password for All Accounts**: **`password123`**
+- **Recruiter Accounts**:
+  - `demo_recruiter_1@example.com` / `password123`
+  - `demo_recruiter_2@example.com` / `password123`
+- **Candidate Accounts**:
+  - `demo_candidate_1@example.com` through `demo_candidate_20@example.com` / `password123`
+
+### Benchmark Seed Script (Part 3.3 High-Volume Performance Benchmark)
+Populates the database with **10,000+ candidate application records** specifically used for testing server-side streaming CSV export and TCP backpressure:
+```bash
+npm run seedBenchmarkData
+# or
+npm run seed:benchmark
+```
+
+**Benchmark Recruiter Credentials**:
+- **Email**: `benchmark_recruiter@example.com`
+- **Password**: `password123`
+
+

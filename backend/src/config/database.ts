@@ -1,3 +1,11 @@
+import dotenv from "dotenv";
+import path from "path";
+
+// Ensure environment variables are loaded before reading DATABASE_URL
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config();
+
 import { Sequelize } from "sequelize";
 
 // Database connection instance (reads connection string from environment variables)
@@ -21,12 +29,6 @@ const sequelize = new Sequelize(databaseUrl, {
         },
       }
     : {},
-  define: {
-    timestamps: true,
-    createdAt: "created_at",
-    updatedAt: "updated_at",
-    underscored: true,
-  },
 });
 
 export default sequelize;

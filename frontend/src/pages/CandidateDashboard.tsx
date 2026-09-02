@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Job } from "../types/job";
+import { Job, PaginationMeta } from "../types/job";
 import { Application } from "../types/application";
 import {
   CandidateProfile,
@@ -28,11 +28,13 @@ import { CandidateJobList } from "../components/jobs/CandidateJobList";
 import { JobDetailsModal } from "../components/jobs/JobDetailsModal";
 import { ApplyConfirmModal } from "../components/applications/ApplyConfirmModal";
 import { ApplicationList } from "../components/applications/ApplicationList";
+import { CandidateTimelineModal } from "../components/applications/CandidateTimelineModal";
 import { CandidateProfileCard } from "../components/profile/CandidateProfileCard";
 import { CandidateProfileForm } from "../components/profile/CandidateProfileForm";
 import { DeleteProfileConfirmModal } from "../components/profile/DeleteProfileConfirmModal";
 import { ResumeUploadModal } from "../components/profile/ResumeUploadModal";
 import { DeleteResumeConfirmModal } from "../components/profile/DeleteResumeConfirmModal";
+import { ProfileRequiredModal } from "../components/profile/ProfileRequiredModal";
 
 export const CandidateDashboard: React.FC = () => {
   const { logout } = useAuth();
@@ -41,15 +43,20 @@ export const CandidateDashboard: React.FC = () => {
     "jobs" | "applications" | "profile"
   >("jobs");
 
-  // Open Jobs State
+  // Open Jobs State & Pagination
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobPagination, setJobPagination] = useState<PaginationMeta | undefined>();
+  const [jobPage, setJobPage] = useState<number>(1);
   const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
   const [jobError, setJobError] = useState<string | null>(null);
 
-  // Candidate Applications State
+  // Candidate Applications State & Pagination
   const [applications, setApplications] = useState<Application[]>([]);
+  const [appPagination, setAppPagination] = useState<PaginationMeta | undefined>();
+  const [appPage, setAppPage] = useState<number>(1);
   const [loadingApps, setLoadingApps] = useState<boolean>(true);
   const [appError, setAppError] = useState<string | null>(null);
+  const [selectedTimelineAppId, setSelectedTimelineAppId] = useState<number | null>(null);
 
   // Candidate Profile State
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
@@ -64,6 +71,7 @@ export const CandidateDashboard: React.FC = () => {
   // Profile Modals
   const [isProfileFormOpen, setIsProfileFormOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isProfileRequiredOpen, setIsProfileRequiredOpen] = useState<boolean>(false);
 
   // Resume Modals
   const [isResumeUploadOpen, setIsResumeUploadOpen] = useState<boolean>(false);
@@ -77,13 +85,15 @@ export const CandidateDashboard: React.FC = () => {
     }, 4000);
   };
 
-  const fetchOpenJobs = useCallback(async () => {
+  const fetchOpenJobs = useCallback(async (page: number = 1) => {
     try {
       setLoadingJobs(true);
       setJobError(null);
-      const res = await getJobs();
-      if (res.success && Array.isArray(res.data)) {
-        setJobs(res.data);
+      const res = await getJobs({ page, limit: 12 });
+      if (res.success && res.data) {
+        setJobs(res.data.jobs || []);
+        setJobPagination(res.data.pagination);
+        setJobPage(res.data.pagination?.page || page);
       }
     } catch (err) {
       const errorMsg =
@@ -94,13 +104,15 @@ export const CandidateDashboard: React.FC = () => {
     }
   }, []);
 
-  const fetchMyApplications = useCallback(async () => {
+  const fetchMyApplications = useCallback(async (page: number = 1) => {
     try {
       setLoadingApps(true);
       setAppError(null);
-      const res = await getApplications();
-      if (res.success && Array.isArray(res.data)) {
-        setApplications(res.data);
+      const res = await getApplications({ page, limit: 12 });
+      if (res.success && res.data) {
+        setApplications(res.data.applications || []);
+        setAppPagination(res.data.pagination);
+        setAppPage(res.data.pagination?.page || page);
       }
     } catch (err) {
       const errorMsg =
@@ -132,8 +144,8 @@ export const CandidateDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchOpenJobs();
-    fetchMyApplications();
+    fetchOpenJobs(1);
+    fetchMyApplications(1);
     fetchCandidateProfile();
   }, [fetchOpenJobs, fetchMyApplications, fetchCandidateProfile]);
 
@@ -141,10 +153,18 @@ export const CandidateDashboard: React.FC = () => {
     return new Set(applications.map((app) => app.job_id));
   }, [applications]);
 
+  const handleApplyClick = (job: Job) => {
+    if (!profile) {
+      setIsProfileRequiredOpen(true);
+      return;
+    }
+    setSelectedJobForApply(job);
+  };
+
   const handleApplyConfirm = async (job: Job) => {
     await createApplication({ job_id: job.id });
     showToast(`Application submitted successfully for ${job.title}`);
-    await fetchMyApplications();
+    await fetchMyApplications(appPage);
   };
 
   const handleSaveProfile = async (
@@ -230,7 +250,7 @@ export const CandidateDashboard: React.FC = () => {
                 : styles.tabButton
             }
           >
-            💼 Available Jobs ({jobs.length})
+            💼 Available Jobs ({jobPagination?.total || jobs.length})
           </button>
           <button
             onClick={() => setActiveTab("applications")}
@@ -240,7 +260,7 @@ export const CandidateDashboard: React.FC = () => {
                 : styles.tabButton
             }
           >
-            📄 My Applications ({applications.length})
+            📄 My Applications ({appPagination?.total || applications.length})
           </button>
           <button
             onClick={() => setActiveTab("profile")}
@@ -268,7 +288,7 @@ export const CandidateDashboard: React.FC = () => {
             {jobError && (
               <div style={styles.errorBanner}>
                 <p style={styles.errorBannerText}>{jobError}</p>
-                <button onClick={fetchOpenJobs} style={styles.retryBtn}>
+                <button onClick={() => fetchOpenJobs(jobPage)} style={styles.retryBtn}>
                   Retry
                 </button>
               </div>
@@ -276,7 +296,9 @@ export const CandidateDashboard: React.FC = () => {
 
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>Available Open Jobs</h2>
-              <span style={styles.countBadge}>{jobs.length} open</span>
+              <span style={styles.countBadge}>
+                {jobPagination?.total || jobs.length} open jobs
+              </span>
             </div>
 
             {loadingJobs ? (
@@ -288,8 +310,14 @@ export const CandidateDashboard: React.FC = () => {
               <CandidateJobList
                 jobs={jobs}
                 appliedJobIds={appliedJobIds}
+                pagination={jobPagination}
+                loading={loadingJobs}
                 onView={(job) => setSelectedJobForView(job)}
-                onApply={(job) => setSelectedJobForApply(job)}
+                onApply={handleApplyClick}
+                onPageChange={(newPage) => {
+                  setJobPage(newPage);
+                  fetchOpenJobs(newPage);
+                }}
               />
             )}
           </section>
@@ -301,7 +329,7 @@ export const CandidateDashboard: React.FC = () => {
             {appError && (
               <div style={styles.errorBanner}>
                 <p style={styles.errorBannerText}>{appError}</p>
-                <button onClick={fetchMyApplications} style={styles.retryBtn}>
+                <button onClick={() => fetchMyApplications(appPage)} style={styles.retryBtn}>
                   Retry
                 </button>
               </div>
@@ -310,7 +338,7 @@ export const CandidateDashboard: React.FC = () => {
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>My Submitted Applications</h2>
               <span style={styles.countBadge}>
-                {applications.length} submitted
+                {appPagination?.total || applications.length} submitted
               </span>
             </div>
 
@@ -320,7 +348,50 @@ export const CandidateDashboard: React.FC = () => {
                 <p style={styles.loadingText}>Loading your applications...</p>
               </div>
             ) : (
-              <ApplicationList applications={applications} />
+              <div style={styles.appsContainer}>
+                <ApplicationList
+                  applications={applications}
+                  onViewTimeline={(id) => setSelectedTimelineAppId(id)}
+                />
+
+                {appPagination && appPagination.totalPages > 0 && (
+                  <div style={styles.paginationBar}>
+                    <button
+                      onClick={() => {
+                        const newPage = appPage - 1;
+                        setAppPage(newPage);
+                        fetchMyApplications(newPage);
+                      }}
+                      disabled={appPage <= 1 || loadingApps}
+                      style={
+                        appPage <= 1 || loadingApps
+                          ? { ...styles.pageBtn, ...styles.pageBtnDisabled }
+                          : styles.pageBtn
+                      }
+                    >
+                      ‹ Previous
+                    </button>
+                    <span style={styles.pageInfo}>
+                      Page {appPage} of {appPagination.totalPages} ({appPagination.total} total)
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newPage = appPage + 1;
+                        setAppPage(newPage);
+                        fetchMyApplications(newPage);
+                      }}
+                      disabled={appPage >= appPagination.totalPages || loadingApps}
+                      style={
+                        appPage >= appPagination.totalPages || loadingApps
+                          ? { ...styles.pageBtn, ...styles.pageBtnDisabled }
+                          : styles.pageBtn
+                      }
+                    >
+                      Next ›
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </section>
         )}
@@ -397,6 +468,12 @@ export const CandidateDashboard: React.FC = () => {
         onConfirm={handleApplyConfirm}
       />
 
+      {/* Application Timeline Modal */}
+      <CandidateTimelineModal
+        applicationId={selectedTimelineAppId}
+        onClose={() => setSelectedTimelineAppId(null)}
+      />
+
       {/* Candidate Profile Form Modal (Create / Edit) */}
       {isProfileFormOpen && (
         <CandidateProfileForm
@@ -426,6 +503,17 @@ export const CandidateDashboard: React.FC = () => {
         isOpen={isResumeDeleteOpen}
         onClose={() => setIsResumeDeleteOpen(false)}
         onConfirm={handleDeleteResumeConfirm}
+      />
+
+      {/* Complete Profile Required Modal */}
+      <ProfileRequiredModal
+        isOpen={isProfileRequiredOpen}
+        onClose={() => setIsProfileRequiredOpen(false)}
+        onGoToProfile={() => {
+          setIsProfileRequiredOpen(false);
+          setActiveTab("profile");
+          setIsProfileFormOpen(true);
+        }}
       />
     </div>
   );
@@ -599,6 +687,42 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#94a3b8",
     margin: 0,
     fontSize: "0.95rem",
+  },
+  appsContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  },
+  paginationBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(30, 41, 59, 0.7)",
+    borderRadius: "0.75rem",
+    padding: "0.75rem 1.25rem",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+  },
+  pageInfo: {
+    color: "#94a3b8",
+    fontSize: "0.9rem",
+    fontWeight: "500",
+  },
+  pageBtn: {
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    color: "#38bdf8",
+    border: "1px solid rgba(56, 189, 248, 0.3)",
+    borderRadius: "0.5rem",
+    padding: "0.45rem 1rem",
+    fontSize: "0.875rem",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  pageBtnDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    color: "#64748b",
+    backgroundColor: "transparent",
   },
   emptyProfileCard: {
     backgroundColor: "rgba(30, 41, 59, 0.6)",

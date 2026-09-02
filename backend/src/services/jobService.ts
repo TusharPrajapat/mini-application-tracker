@@ -1,6 +1,11 @@
 import { Job } from "../models/Job";
 import { JobStatus, UserRole } from "../types/commonEnum";
-import { CreateJobDTO, UpdateJobDTO } from "../interfaces/jobInterface";
+import {
+  CreateJobDTO,
+  UpdateJobDTO,
+  JobListQuery,
+  PaginationMeta,
+} from "../interfaces/jobInterface";
 
 export class JobService {
   /**
@@ -15,7 +20,7 @@ export class JobService {
     ) {
       throw new Error("title is required and must be a non-empty string");
     }
-    console.log("data", data);
+
     if (
       !data.description ||
       typeof data.description !== "string" ||
@@ -36,7 +41,7 @@ export class JobService {
       const numericStatus = Number(data.status);
       if (isNaN(numericStatus) || !validStatuses.includes(numericStatus)) {
         throw new Error(
-          `Invalid status value. Allowed status values are CLOSED (${JobStatus.CLOSED}), DRAFT (${JobStatus.DRAFT}), or OPEN (${JobStatus.OPEN})`,
+          `Invalid status value. Allowed status values are CLOSED (${JobStatus.CLOSED}), DRAFT (${JobStatus.DRAFT}), or OPEN (${JobStatus.OPEN})`
         );
       }
       status = numericStatus as JobStatus;
@@ -53,26 +58,49 @@ export class JobService {
   }
 
   /**
-   * Get list of Jobs based on role:
+   * Get list of Jobs based on role with server-side database pagination:
    * - RECRUITER: Returns jobs created by recruiter (jobs.recruiter_id = user.userId)
    * - CANDIDATE: Returns jobs with status = JobStatus.OPEN
    */
-  async getJobs(user: { userId: number; role: UserRole }): Promise<Job[]> {
+  async getJobs(
+    user: { userId: number; role: UserRole },
+    query: JobListQuery = {}
+  ): Promise<{ jobs: Job[]; pagination: PaginationMeta }> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = query.limit && query.limit > 0 ? query.limit : 12;
+    const offset = (page - 1) * limit;
+
+    let whereClause: Record<string, unknown> = {};
+
     if (user.role === UserRole.RECRUITER) {
-      return await Job.findAll({
-        where: { recruiter_id: user.userId },
-        order: [["created_at", "DESC"]],
-      });
+      whereClause = { recruiter_id: user.userId };
+    } else if (user.role === UserRole.CANDIDATE) {
+      whereClause = { status: JobStatus.OPEN };
+    } else {
+      return {
+        jobs: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      };
     }
 
-    if (user.role === UserRole.CANDIDATE) {
-      return await Job.findAll({
-        where: { status: JobStatus.OPEN },
-        order: [["created_at", "DESC"]],
-      });
-    }
+    const { count, rows } = await Job.findAndCountAll({
+      where: whereClause,
+      limit,
+      offset,
+      order: [["created_at", "DESC"]],
+    });
 
-    return [];
+    const totalPages = count === 0 ? 0 : Math.ceil(count / limit);
+
+    return {
+      jobs: rows,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages,
+      },
+    };
   }
 
   /**
@@ -82,7 +110,7 @@ export class JobService {
    */
   async getJobById(
     id: number,
-    user: { userId: number; role: UserRole },
+    user: { userId: number; role: UserRole }
   ): Promise<Job> {
     if (isNaN(id) || id <= 0) {
       throw new Error("ID must be a positive integer");
@@ -97,7 +125,7 @@ export class JobService {
     if (user.role === UserRole.RECRUITER) {
       if (job.recruiter_id !== user.userId) {
         throw new Error(
-          "Forbidden: You do not have permission to access another recruiter's job",
+          "Forbidden: You do not have permission to access another recruiter's job"
         );
       }
     } else if (user.role === UserRole.CANDIDATE) {
@@ -116,7 +144,7 @@ export class JobService {
   async updateJob(
     id: number,
     recruiterId: number,
-    data: UpdateJobDTO,
+    data: UpdateJobDTO
   ): Promise<Job> {
     if (isNaN(id) || id <= 0) {
       throw new Error("ID must be a positive integer");
@@ -158,7 +186,7 @@ export class JobService {
       const numericStatus = Number(data.status);
       if (isNaN(numericStatus) || !validStatuses.includes(numericStatus)) {
         throw new Error(
-          `Invalid status value. Allowed status values are CLOSED (${JobStatus.CLOSED}), DRAFT (${JobStatus.DRAFT}), or OPEN (${JobStatus.OPEN})`,
+          `Invalid status value. Allowed status values are CLOSED (${JobStatus.CLOSED}), DRAFT (${JobStatus.DRAFT}), or OPEN (${JobStatus.OPEN})`
         );
       }
       job.status = numericStatus as JobStatus;

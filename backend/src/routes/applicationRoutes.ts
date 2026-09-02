@@ -14,12 +14,38 @@ router.post(
   (req, res, next) => applicationController.createApplication(req, res, next)
 );
 
+// GET /api/applications/export - Recruiter CSV export of applications (RECRUITER only)
+router.get(
+  "/export",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) => applicationController.exportApplications(req, res, next)
+);
+
 // GET /api/applications - List applications (RECRUITER: owned jobs; CANDIDATE: own applications)
 router.get(
   "/",
   authenticateToken,
   requireRole(UserRole.RECRUITER, UserRole.CANDIDATE),
   (req, res, next) => applicationController.getApplications(req, res, next)
+);
+
+// PUT /api/applications/bulk-stage - Recruiter bulk application stage change (RECRUITER only)
+router.put(
+  "/bulk-stage",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) =>
+    applicationController.bulkUpdateApplicationStage(req, res, next)
+);
+
+// GET /api/applications/:id/timeline - Get candidate application status timeline (CANDIDATE only)
+router.get(
+  "/:id/timeline",
+  authenticateToken,
+  requireRole(UserRole.CANDIDATE),
+  (req, res, next) =>
+    applicationController.getApplicationTimeline(req, res, next)
 );
 
 // GET /api/applications/:id - Get application by ID (RECRUITER: owned job; CANDIDATE: own application)
@@ -32,6 +58,15 @@ router.get(
 
 // PUT /api/applications/:id/stage - Update application stage with version check (RECRUITER only)
 router.put(
+  "/:id/stage",
+  authenticateToken,
+  requireRole(UserRole.RECRUITER),
+  (req, res, next) =>
+    applicationController.updateApplicationStage(req, res, next)
+);
+
+// PATCH /api/applications/:id/stage - Update application stage with version check (RECRUITER only)
+router.patch(
   "/:id/stage",
   authenticateToken,
   requireRole(UserRole.RECRUITER),

@@ -1,5 +1,35 @@
 import { Request, Response, NextFunction } from "express";
 import { jobService } from "../services/jobService";
+import { JobListQuery } from "../interfaces/jobInterface";
+
+function parsePaginationQueryParams(reqQuery: Record<string, unknown>): JobListQuery {
+  const query: JobListQuery = {};
+
+  if (reqQuery.page !== undefined && reqQuery.page !== "") {
+    const rawPage = String(reqQuery.page).trim();
+    const pageNum = Number(rawPage);
+    if (!/^\d+$/.test(rawPage) || isNaN(pageNum) || pageNum <= 0) {
+      throw new Error("Invalid page: Must be a positive integer");
+    }
+    query.page = pageNum;
+  }
+
+  if (reqQuery.limit !== undefined && reqQuery.limit !== "") {
+    const rawLimit = String(reqQuery.limit).trim();
+    const limitNum = Number(rawLimit);
+    if (
+      !/^\d+$/.test(rawLimit) ||
+      isNaN(limitNum) ||
+      limitNum <= 0 ||
+      limitNum > 100
+    ) {
+      throw new Error("Invalid limit: Must be a positive integer up to 100");
+    }
+    query.limit = limitNum;
+  }
+
+  return query;
+}
 
 export class JobController {
   /**
@@ -9,10 +39,9 @@ export class JobController {
   async createJob(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ): Promise<void> {
     try {
-      console.log("req.user", req.user);
       if (!req.user) {
         res.status(401).json({ success: false, error: "Unauthenticated" });
         return;
@@ -39,23 +68,21 @@ export class JobController {
         return;
       }
 
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message || "Internal server error",
-        });
+      res.status(500).json({
+        success: false,
+        error: err.message || "Internal server error",
+      });
     }
   }
 
   /**
    * HTTP Handler for GET /api/jobs
-   * Returns recruiter's own jobs for RECRUITER, or OPEN jobs for CANDIDATE.
+   * Returns recruiter's own jobs for RECRUITER, or OPEN jobs for CANDIDATE with server-side pagination.
    */
   async getJobs(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ): Promise<void> {
     try {
       if (!req.user) {
@@ -63,20 +90,29 @@ export class JobController {
         return;
       }
 
-      const jobs = await jobService.getJobs(req.user);
+      const query = parsePaginationQueryParams(req.query as Record<string, unknown>);
+
+      const result = await jobService.getJobs(req.user, query);
 
       res.status(200).json({
         success: true,
-        data: jobs,
+        data: result,
       });
     } catch (error) {
       const err = error as Error;
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message || "Internal server error",
-        });
+
+      if (
+        err.message.includes("Invalid page") ||
+        err.message.includes("Invalid limit")
+      ) {
+        res.status(400).json({ success: false, error: err.message });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        error: err.message || "Internal server error",
+      });
     }
   }
 
@@ -86,7 +122,7 @@ export class JobController {
   async getJobById(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ): Promise<void> {
     try {
       if (!req.user) {
@@ -120,12 +156,10 @@ export class JobController {
         return;
       }
 
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message || "Internal server error",
-        });
+      res.status(500).json({
+        success: false,
+        error: err.message || "Internal server error",
+      });
     }
   }
 
@@ -136,7 +170,7 @@ export class JobController {
   async updateJob(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ): Promise<void> {
     try {
       if (!req.user) {
@@ -180,12 +214,10 @@ export class JobController {
         return;
       }
 
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message || "Internal server error",
-        });
+      res.status(500).json({
+        success: false,
+        error: err.message || "Internal server error",
+      });
     }
   }
 
@@ -196,7 +228,7 @@ export class JobController {
   async deleteJob(
     req: Request,
     res: Response,
-    next: NextFunction,
+    next: NextFunction
   ): Promise<void> {
     try {
       if (!req.user) {
@@ -230,12 +262,10 @@ export class JobController {
         return;
       }
 
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message || "Internal server error",
-        });
+      res.status(500).json({
+        success: false,
+        error: err.message || "Internal server error",
+      });
     }
   }
 }

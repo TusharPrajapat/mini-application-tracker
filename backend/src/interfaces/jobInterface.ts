@@ -11,3 +11,15 @@ export interface UpdateJobDTO {
   description?: string;
   status?: JobStatus;
 }
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface JobListQuery {
+  page?: number;
+  limit?: number;
+}

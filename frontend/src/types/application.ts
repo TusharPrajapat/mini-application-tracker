@@ -1,4 +1,4 @@
-import { Job } from "./job";
+import { Job, PaginationMeta } from "./job";
 
 export enum ApplicationStage {
   APPLIED = 1,
@@ -12,6 +12,13 @@ export interface CandidateInfo {
   id: number;
   email: string;
   role: number;
+  candidateProfile?: {
+    full_name: string;
+    phone?: string | null;
+    skills?: string | null;
+    experience?: string | null;
+    resume_path?: string | null;
+  } | null;
 }
 
 export interface Application {
@@ -37,9 +44,39 @@ export interface UpdateApplicationStagePayload {
   version: number;
 }
 
+export interface BulkUpdateApplicationStagePayload {
+  applicationIds: (number | string)[];
+  stage: ApplicationStage;
+}
+
+export interface BulkStageItemResult {
+  application_id: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface BulkUpdateApplicationStageResponse {
+  success: boolean;
+  message: string;
+  updatedCount: number;
+  results?: BulkStageItemResult[];
+}
+
+export interface ApplicationListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  job_id?: number;
+  stage?: ApplicationStage;
+  sort?: "newest" | "oldest";
+}
+
 export interface ApplicationListResponse {
   success: boolean;
-  data: Application[];
+  data: {
+    applications: Application[];
+    pagination: PaginationMeta;
+  };
 }
 
 export interface ApplicationSingleResponse {

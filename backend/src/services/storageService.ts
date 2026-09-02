@@ -1,17 +1,54 @@
-import { supabaseAdmin } from "../config/supabaseAdmin";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import {
+  supabaseAdmin,
+  supabaseUrl,
+  supabaseAnonKey,
+  supabaseServiceRoleKey,
+} from "../config/supabaseAdmin";
 
 const BUCKET_NAME = "resumes";
 
 export class StorageService {
+  /**
+   * Returns an appropriately authenticated Supabase client:
+   * 1. If SUPABASE_SERVICE_ROLE_KEY exists, uses supabaseAdmin (service_role bypasses RLS).
+   * 2. If accessToken is provided, creates client with Authorization header (user JWT authenticated for RLS).
+   * 3. Falls back to default supabaseAdmin.
+   */
+  private getClient(accessToken?: string): SupabaseClient {
+    if (supabaseServiceRoleKey && supabaseServiceRoleKey.trim() !== "") {
+      return supabaseAdmin;
+    }
+
+    if (accessToken && accessToken.trim() !== "") {
+      return createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      });
+    }
+
+    return supabaseAdmin;
+  }
+
   /**
    * Upload or overwrite resume file buffer in Supabase Storage private bucket.
    */
   async uploadResume(
     storagePath: string,
     fileBuffer: Buffer,
-    mimeType: string
+    mimeType: string,
+    accessToken?: string
   ): Promise<string> {
-    const { data, error } = await supabaseAdmin.storage
+    const client = this.getClient(accessToken);
+
+    const { data, error } = await client.storage
       .from(BUCKET_NAME)
       .upload(storagePath, fileBuffer, {
         contentType: mimeType,
@@ -28,8 +65,10 @@ export class StorageService {
   /**
    * Delete resume file object from Supabase Storage private bucket.
    */
-  async deleteResume(storagePath: string): Promise<void> {
-    const { error } = await supabaseAdmin.storage
+  async deleteResume(storagePath: string, accessToken?: string): Promise<void> {
+    const client = this.getClient(accessToken);
+
+    const { error } = await client.storage
       .from(BUCKET_NAME)
       .remove([storagePath]);
 
@@ -43,9 +82,12 @@ export class StorageService {
    */
   async createSignedResumeUrl(
     storagePath: string,
-    expiresIn = 60
+    expiresIn = 60,
+    accessToken?: string
   ): Promise<string> {
-    const { data, error } = await supabaseAdmin.storage
+    const client = this.getClient(accessToken);
+
+    const { data, error } = await client.storage
       .from(BUCKET_NAME)
       .createSignedUrl(storagePath, expiresIn);
 
